@@ -1,0 +1,150 @@
+```
+-- Player Follow Attach Script | 私服專用 LocalScript
+-- 放置位置：StarterPlayer > StarterPlayerScripts
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+
+local localPlr = Players.LocalPlayer
+local plrGui = localPlr:WaitForChild("PlayerGui")
+
+-- 設定參數，你可以改
+local followDistance = 4 -- 吸附在目標後面幾格(stud)
+local followHeightOffset = 1 -- 高度偏移，避免卡腳
+
+-- 追蹤狀態
+local targetPlayer = nil
+local followConn = nil
+
+-- 建立UI
+local gui = Instance.new("ScreenGui")
+gui.Name = "PlayerFollowUI"
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 998
+gui.Parent = plrGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.fromOffset(220, 320)
+mainFrame.Position = UDim2.new(0.02,0,0.3,0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25,25,30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,8)
+mainFrame.Parent = gui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,30)
+title.BackgroundColor3 = Color3.fromRGB(40,40,50)
+title.Text = "伺服器玩家列表 (點擊吸附)"
+title.TextColor3 = Color3.new(1,1,1)
+title.TextSize = 14
+title.Font = Enum.Font.GothamBold
+title.Parent = mainFrame
+Instance.new("UICorner", title).CornerRadius = UDim.new(0,8)
+
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Position = UDim2.fromOffset(5,35)
+scrollFrame.Size = UDim2.new(1,-10,1,-75)
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.CanvasSize = UDim2.new(0,0,0,0)
+scrollFrame.ScrollBarThickness = 4
+scrollFrame.Parent = mainFrame
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0,4)
+listLayout.Parent = scrollFrame
+
+local cancelBtn = Instance.new("TextButton")
+cancelBtn.Position = UDim2.fromOffset(5, mainFrame.AbsoluteSize.Y - 35)
+cancelBtn.Size = UDim2.new(1,-10,0,30)
+cancelBtn.BackgroundColor3 = Color3.fromRGB(160,30,30)
+cancelBtn.Text = "✅ 取消吸附"
+cancelBtn.TextColor3 = Color3.new(1,1,1)
+cancelBtn.TextSize = 14
+cancelBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", cancelBtn).CornerRadius = UDim.new(0,6)
+cancelBtn.Parent = mainFrame
+
+-- 更新玩家列表函式
+local function refreshPlayerList()
+    -- 清空舊按鈕
+    for _,child in ipairs(scrollFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+
+    for _,plr in ipairs(Players:GetPlayers()) do
+        if plr ~= localPlr then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1,0,0,28)
+            btn.BackgroundColor3 = Color3.fromRGB(50,50,60)
+            btn.Text = plr.Name
+            btn.TextColor3 = Color3.new(1,1,1)
+            btn.TextSize = 13
+            btn.Font = Enum.Font.Gotham
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0,5)
+            btn.Parent = scrollFrame
+
+            btn.Activated:Connect(function()
+                targetPlayer = plr
+            end)
+        end
+    end
+    -- 更新滾動範圍
+    scrollFrame.CanvasSize = UDim2.new(0,0,0,listLayout.AbsoluteContentSize.Y)
+end
+
+-- 核心跟隨邏輯
+local function startFollowLoop()
+    if followConn then followConn:Disconnect() end
+
+    followConn = RunService.Heartbeat:Connect(function()
+        if not targetPlayer then return end
+        local targetChar = targetPlayer.Character
+        local myChar = localPlr.Character
+        if not targetChar or not myChar then return end
+
+        local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+        local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+        if not targetRoot or not myRoot then return end
+
+        -- 取得目標面向，往後偏移
+        local backDir = -targetRoot.CFrame.LookVector
+        local newCFrame = CFrame.new(
+            targetRoot.Position + backDir * followDistance + Vector3.new(0, followHeightOffset,0),
+            targetRoot.Position
+        )
+        myRoot.CFrame = newCFrame
+    end)
+end
+
+local function stopFollow()
+    targetPlayer = nil
+    if followConn then
+        followConn:Disconnect()
+        followConn = nil
+    end
+end
+
+cancelBtn.Activated:Connect(function()
+    stopFollow()
+end)
+
+-- 偵測玩家加入離開，自動刷新名單
+Players.PlayerAdded:Connect(refreshPlayerList)
+Players.PlayerRemoving:Connect(refreshPlayerList)
+
+-- 角色重生重新綁定
+localPlr.CharacterAdded:Connect(function()
+    -- 重生後如果還有目標，繼續跟隨
+    if targetPlayer then
+        startFollowLoop()
+    end
+end)
+
+refreshPlayerList()
+startFollowLoop()
+
+print("玩家吸附跟隨腳本載入完成")
+```
